@@ -3,6 +3,7 @@
 , "path": "/usr/local/bin/dropsite-oz"
 , "_watchdog": ["dropsite"]
 , "allow_files": true
+, "reject_user_args": false
 , "xserver": {
 	"enabled": true
 	, "enable_tray": false
@@ -20,8 +21,6 @@
 ]
 , "shared_folders": [
 	"${XDG_DOWNLOAD_DIR}"
-	,"/usr/local/bin/"
-]
 ]
 , "environment": []
 }
