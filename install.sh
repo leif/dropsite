@@ -13,4 +13,6 @@ systemctl restart roflcoptor
 systemctl reload oz-daemon
 #oz-setup remove dropsite
 #oz-setup install dropsite
-
+echo "run dropsite like so:"
+echo "alias dropsite='dropsite-oz -e /usr/local/bin/dropsite'"
+echo "dropsite"
