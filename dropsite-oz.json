@@ -1,6 +1,10 @@
 {
 "name": "dropsite"
-, "path": "/usr/local/bin/dropsite"
+, "path": "/usr/local/bin/dropsite-oz"
+, "default_params": [
+	"-t "
+	,"-S ./tmp/uploads "
+]
 , "_watchdog": ["dropsite"]
 , "allow_files": true
 , "xserver": {
@@ -20,6 +24,9 @@
 ]
 , "whitelist": [
 	{"path": "/var/lib/oz/cells.d/dropsite-whitelist.seccomp"}
+]
+, "shared_folders": [
+	"${XDG_DOWNLOAD_DIR}"
 ]
 , "environment": []
 , "seccomp": {
