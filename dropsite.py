@@ -61,14 +61,15 @@ register_flask_subcommand = lambda f: app.cli.command()(f) and f
                                           type=click.Path(file_okay=False, dir_okay=True,
                                                           exists=True, writable=True,
                                                           resolve_path=True))
-@click.option('-P', '--pipeline', help="Shell pipeline to process files through")
-@click.option('-s', '--suffix',   help="String to append to filenames", default="")
-@click.option('-p', '--port',     help="Port to listen on", default=8080)
-@click.option('-H', '--host',     help="IP to listen on", default="127.0.0.1")
-@click.option('-t', '--onion',    help="Create an ephemeral Tor onion service", is_flag=True)
-@click.option('--serve-source',   help="Include a link to the source code", is_flag=True)
+@click.option('-P', '--pipeline',   help="Shell pipeline to process files through")
+@click.option('-s', '--suffix',     help="String to append to filenames", default="")
+@click.option('-p', '--port',       help="Port to listen on", default=8080)
+@click.option('-H', '--host',       help="IP to listen on", default="127.0.0.1")
+@click.option('-t', '--onion',      help="Create an ephemeral Tor onion service", is_flag=True)
+@click.option('-T', '--onion-port', help="Port to receive Tor onion service connections", default=80)
+@click.option('--serve-source',     help="Include a link to the source code", is_flag=True)
 @click.pass_context
-def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, serve_source):
+def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, onion_port, serve_source):
     """
 This is a small application for receiving file uploads via HTTP. Uploaded files
 can be passed through a shell pipeline and/or written to disk. Here are some
@@ -108,12 +109,14 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
         with Controller.from_port() as controller:
             controller.authenticate()
             print("Creating ephemeral onion listener...")
-            resp = controller.create_ephemeral_hidden_service({80:port}, await_publication=True, detached=True)
+            resp = controller.create_ephemeral_hidden_service({onion_port:port}, await_publication=True, detached=True)
             print("Listening at http://%s.onion/" % (resp.service_id,))
             onion = resp.service_id
 
     app.config.update(
-        dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source, onion_address=onion, bind_address=host))
+        dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix,
+            serve_source=serve_source, onion_address=onion,
+            onion_port=onion_port, bind_address=host, bind_port=port))
     if app.debug:
         run_simple(host, port, app, use_reloader=True,)
     else:
@@ -235,16 +238,19 @@ class HashPipeFileStream(object):
 def endpoint():
 
     config = app.config['dropsite']
+    if config['onion_address']:
+        advertise_host = config['onion_address']
+        advertise_port = config['onion_port']
+    else:
+        advertise_host = config['bind_address']
+        advertise_port = config['bind_port']
 
     if request.method == 'GET':
         return T_PAGE % (T_FORM +
                          ('<p><a href=%s>source code</a></p>' % os.path.basename(__file__)
-                          if config['serve_source'] else ''))
-
-    if request.method == 'GET':
-        return T_PAGE % (T_FORM +
-                         ('<p>curl -F upload=@./YOURFILENAMEHERE {0}</p>'.format(resp.service_id)
-                          if config['serve_source'] else ''))
+                          if config['serve_source'] else '') +
+                         ('<p>Prefer to upload from the command line? Use the following command:</p>' +
+                          '<p>curl -F upload=@./YOURFILENAMEHERE http://{0}:{1}</p>'.format(advertise_host, advertise_port)))
 
     dir_name = None
 
@@ -400,8 +406,6 @@ todo:
         - assuming responses are compressed but requests aren't, I think this
           will obscure the upload filesize?
     - add optional javascript, XHR progress bar?
-    - add curl upload instructions to html?
-      (it's curl -F foo=@./filename to upload ./filename)
     - .desktop file to launch in xterm for use as a desktop app
         - and/or maybe a gtk ui?
     - systemd unit file for use as a daemon
