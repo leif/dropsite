@@ -113,8 +113,7 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
     if app.debug:
         run_simple('localhost', port, app, use_reloader=True,)
     else:
-        #FIXME: use multi-threaded server for multiple simultaneous uploads :)
-        run_simple('localhost', port, app)
+        run_simple('localhost', port, app, threaded=True)
 
 class HashPipeFileStream(object):
 
@@ -394,8 +393,6 @@ todo:
     - add optional javascript, XHR progress bar?
     - add curl upload instructions to html?
       (it's curl -F foo=@./filename to upload ./filename)
-    - run in a multi-threaded webserver (is gunicorn overkill? this is my first
-      web app in years, i have no idea what i'm doing .jpg)
     - .desktop file to launch in xterm for use as a desktop app
         - and/or maybe a gtk ui?
     - systemd unit file for use as a daemon
