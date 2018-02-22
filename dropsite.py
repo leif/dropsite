@@ -406,10 +406,7 @@ todo:
         - assuming responses are compressed but requests aren't, I think this
           will obscure the upload filesize?
     - add optional javascript, XHR progress bar?
-    - .desktop file to launch in xterm for use as a desktop app
-        - and/or maybe a gtk ui?
     - systemd unit file for use as a daemon
-    - python packaging
     - debian packaging
     - test on tails
     - think about dos mitigation, especially in the context of small computers
