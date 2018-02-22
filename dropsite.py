@@ -64,10 +64,11 @@ register_flask_subcommand = lambda f: app.cli.command()(f) and f
 @click.option('-P', '--pipeline', help="Shell pipeline to process files through")
 @click.option('-s', '--suffix',   help="String to append to filenames", default="")
 @click.option('-p', '--port',     help="Port to listen on", default=8080)
+@click.option('-H', '--host',     help="IP to listen on", default="127.0.0.1")
 @click.option('-t', '--onion',    help="Create an ephemeral Tor onion service", is_flag=True)
 @click.option('--serve-source',   help="Include a link to the source code", is_flag=True)
 @click.pass_context
-def dropsite(ctx, port, save_to, pipeline, suffix, onion, serve_source):
+def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, serve_source):
     """
 This is a small application for receiving file uploads via HTTP. Uploaded files
 can be passed through a shell pipeline and/or written to disk. Here are some
@@ -101,19 +102,22 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
         ctx.exit("error: You must specify at least one of -S/--save-to or -P/--pipeline.")
 
     if onion:
+        if host != "127.0.0.1":
+            ctx.exit("error: You may not run an onion when binding to a non-localhost ip")
         from stem.control import Controller
         with Controller.from_port() as controller:
             controller.authenticate()
             print("Creating ephemeral onion listener...")
             resp = controller.create_ephemeral_hidden_service({80:port}, await_publication=True, detached=True)
             print("Listening at http://%s.onion/" % (resp.service_id,))
+            onion = resp.service_id
 
     app.config.update(
-        dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source))
+        dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source, onion_address=onion, bind_address=host))
     if app.debug:
-        run_simple('localhost', port, app, use_reloader=True,)
+        run_simple(host, port, app, use_reloader=True,)
     else:
-        run_simple('localhost', port, app, threaded=True)
+        run_simple(host, port, app, threaded=True)
 
 class HashPipeFileStream(object):
 
@@ -235,6 +239,11 @@ def endpoint():
     if request.method == 'GET':
         return T_PAGE % (T_FORM +
                          ('<p><a href=%s>source code</a></p>' % os.path.basename(__file__)
+                          if config['serve_source'] else ''))
+
+    if request.method == 'GET':
+        return T_PAGE % (T_FORM +
+                         ('<p>curl -F upload=@./YOURFILENAMEHERE {0}</p>'.format(resp.service_id)
                           if config['serve_source'] else ''))
 
     dir_name = None
