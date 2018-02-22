@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Name=Dropsite
+Terminal=false
+Catagories=Network;FileTransfer;python
+Comment=Private file transfer made easy
+Icon=dropsite
+Exec=dropsite-oz -e /usr/local/bin/dropsite
