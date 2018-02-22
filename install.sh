@@ -2,6 +2,14 @@
 set -x
 set -e
 
+# Desktop file
+cp -v dropsite.desktop /usr/share/applications/dropsite.desktop
+# Specific theme
+cp -v dropsite.svg /usr/share/icons/Adwaita/scalable/apps/dropsite.svg
+cp -v dropsite.png /usr/share/icons/Adwaita/48x48/apps/dropsite.png
+# Default image for all themes
+cp -v dropsite.png /usr/share/icons/dropsite.png
+
 cp -v dropsite.py /usr/local/bin/dropsite.py
 cp -v dropsite-wrapper.sh /usr/local/bin/dropsite
 chmod +x /usr/local/bin/dropsite
