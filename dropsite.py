@@ -396,7 +396,6 @@ todo:
     - .desktop file to launch in xterm for use as a desktop app
         - and/or maybe a gtk ui?
     - systemd unit file for use as a daemon
-    - oz + roflcoptor profiles
     - python packaging
     - debian packaging
     - test on tails
