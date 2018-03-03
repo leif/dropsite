@@ -103,23 +103,21 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
         ctx.exit("error: You must specify at least one of -S/--save-to or -P/--pipeline.")
 
     if onion:
-        if host != "127.0.0.1":
-            ctx.exit("error: You may not run an onion when binding to a non-localhost ip")
         from stem.control import Controller
         with Controller.from_port() as controller:
             controller.authenticate()
             print("Creating ephemeral onion listener...")
             resp = controller.create_ephemeral_hidden_service({onion_port:port}, await_publication=True, detached=True)
-            print("Listening at http://%s.onion/" % (resp.service_id,))
+            print("Listening at http://%s.onion:%s/" % (resp.service_id, onion_port))
             onion = resp.service_id
 
-    app.config.update(
-        dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix,
-            serve_source=serve_source, onion_address=onion,
-            onion_port=onion_port, bind_address=host, bind_port=port))
+    app.config.update( dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source) )
+
     if app.debug:
         run_simple(host, port, app, use_reloader=True,)
+
     else:
+        # FIXME: use gunicorn, or something else?
         run_simple(host, port, app, threaded=True)
 
 class HashPipeFileStream(object):
@@ -238,19 +236,11 @@ class HashPipeFileStream(object):
 def endpoint():
 
     config = app.config['dropsite']
-    if config['onion_address']:
-        advertise_host = config['onion_address']
-        advertise_port = config['onion_port']
-    else:
-        advertise_host = config['bind_address']
-        advertise_port = config['bind_port']
 
     if request.method == 'GET':
         return T_PAGE % (T_FORM +
                          ('<p><a href=%s>source code</a></p>' % os.path.basename(__file__)
-                          if config['serve_source'] else '') +
-                         ('<p>Prefer to upload from the command line? Use the following command:</p>' +
-                          '<p>curl -F upload=@./YOURFILENAMEHERE http://{0}:{1}</p>'.format(advertise_host, advertise_port)))
+                          if config['serve_source'] else ''))
 
     dir_name = None
 
@@ -330,6 +320,8 @@ T_FORM="""
 <h2>step 2: click the send button</h2>
 <input type=submit value=send>
 </form>
+<p>Prefer to upload from the command line? Use the following command:</p>
+<p>curl -F upload=@./FILENAME http://URL/</p>
 """
 
 T_RESULT="""<tr> <td>{filename}</td> <td>{length}</td> <td>{kbps:.1f}</td> <td>{seconds:.1f} seconds</td>
@@ -408,6 +400,7 @@ todo:
     - add optional javascript, XHR progress bar?
     - systemd unit file for use as a daemon
     - debian packaging
+    - gtk ui?
     - test on tails
     - think about dos mitigation, especially in the context of small computers
       running this

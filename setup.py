@@ -19,7 +19,7 @@ setup(
     use_scm_version=True,
     author="Leif Ryge",
     author_email="leif@synthesize.us",
-    description="Easy file transfer",
+    description="Webserver for receiving file uploads",
     long_description=readme(),
     license="none",
     keywords="python http onion tor filetransfer",
