@@ -6,11 +6,12 @@ of our time: how can we transfer files between our computers (also known as the
 XKCD#949 problem). Among other things, this can be useful for easily
 transferring files from a mobile phone to a laptop, via a WiFi LAN or Tor.
 
-dropsite could also be used in a less ephemeral configuration, providing a sort
-of miniature document submission system with much less complexity, attack
-surface, features, etc than SecureDrop and GlobaLeaks offer. But you shouldn't
-use it for anything too important before some people besides the author have
-looked for bugs in it :)
+dropsite can save uploaded files to disk with a unique name and/or filter data
+through a shell pipeline as it is being uploaded. Therefore, it could also be
+used in a less ephemeral configuration, providing a sort of miniature document
+submission system with much less complexity, attack surface, features, etc than
+SecureDrop and GlobaLeaks offer. But you shouldn't use it for anything too
+important before some people besides the author have looked for bugs in it :)
 
 The only dependencies are flask (and its dependencies). I think this should run
 anywhere you can "pip install flask", but I've only tried it on Debian using
@@ -104,12 +105,12 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
 
     if onion:
         from stem.control import Controller
+        print("Connecting to tor control port")
         with Controller.from_port() as controller:
             controller.authenticate()
             print("Creating ephemeral onion listener...")
             resp = controller.create_ephemeral_hidden_service({onion_port:port}, await_publication=True, detached=True)
-            print("Listening at http://%s.onion:%s/" % (resp.service_id, onion_port))
-            onion = resp.service_id
+            print("Listening at http://%s.onion%s/" % (resp.service_id, ':%s'%(onion_port,) if onion_port is not 80 else ''))
 
     app.config.update( dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source) )
 
@@ -219,7 +220,7 @@ class HashPipeFileStream(object):
         self.hash.update(data)
 
     def seek(self, a):
-        assert a == 0, "this is solely for werkzeug to tell us it is done with seek(0)"
+        assert a == 0, "this is solely for werkzeug to tell us it is done, with seek(0)"
         self.cleanup()
         seconds = time.time() - self.start_time
         if self.unsanitized_name == "" and self.length == 0:
@@ -354,6 +355,7 @@ some werkzeug annoyances i encountered while writing this:
     - parse_form_data parses *lines* internally, so write() gets called on the
       stream object twice per line (the second time being a \n or \r or \r\n)
       this is irritating but doesn't really matter, i guess?
+      this is https://github.com/pallets/werkzeug/issues/875
 
     - the signature of werkzeug's default_stream_factory has its arguments in
       the wrong order (it doesn't use them, so it doesn't matter). (TODO: PR)
