@@ -54,8 +54,6 @@ from werkzeug.utils import secure_filename
 
 assert sys.version_info[0] >= 3, "dropsite requires python3"
 
-app = Flask(__name__)
-
 # unnecessary, but makes this also work as subcommand of flask
 
 @click.command()
@@ -70,8 +68,9 @@ app = Flask(__name__)
 @click.option('-t', '--onion',      help="Create an ephemeral Tor onion service", is_flag=True)
 @click.option('-T', '--onion-port', help="Port to receive Tor onion service connections (when --onion is specified)", default=80, show_default=True)
 @click.option('--serve-source',     help="Include a link to the source code", is_flag=True)
+@click.option('--base-path',     help="Path where the application lives", default='/', show_default=True)
 @click.pass_context
-def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, onion_port, serve_source):
+def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, onion_port, serve_source, base_path):
     """
 This is a small application for receiving file uploads via HTTP. Uploaded files
 can be passed through a shell pipeline and/or written to disk. Here are some
@@ -96,8 +95,73 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
 
 #    app.logger.handlers = []
 
+    app = Flask(__name__)
+
+
+    @app.route(base_path, methods=["GET", "POST"])
+    def endpoint():
+
+        config = app.config['dropsite']
+
+        if request.method == 'GET':
+            return T_PAGE % (T_FORM +
+                             ('<p><a href=%s>source code</a></p>' % os.path.join(base_path, os.path.basename(__file__))
+                              if config['serve_source'] else ''))
+
+        dir_name = None
+
+        if config['save_to']:
+            dir_name = os.path.join(config['save_to'], datetime.datetime.now().isoformat().replace(':','-'))
+            assert not os.path.exists(dir_name), "%s existing was unexpected" % (dir_name,)
+            os.mkdir(dir_name)
+
+        results, open_streams = [], []
+
+        def callback(res):
+            results.append(res)
+            print("OK: {filename!r} ({length} bytes @ at {kbps:.1f} KB/s) -> {actual_filename!r}".format(**res))
+
+        factory = HashPipeFileStream.factory_factory(
+                    register = open_streams.append,
+                    callback = callback,
+                    dir_name = dir_name,
+                    pipeline = config['pipeline'],
+                    suffix   = config['suffix'],
+                    hash_fn  = hashlib.sha256
+                    )
+
+        try:
+            stream, form, files = parse_form_data(request.environ, stream_factory=factory)
+
+        except ClientDisconnected:
+            for stream in open_streams:
+                if stream.done:
+                    continue
+                stream.cleanup()
+                if stream.actual_filename is not None:
+                    _, partial_name = stream.ensure_unique(stream.actual_filename, '.partial')
+                    os.rename(str(stream.actual_filename), str(partial_name))
+                print("FAIL: during a supposed %s byte request, client disconnected after writing %s bytes of %r to %r" % (
+                        stream.req_length, stream.length, stream.filename, partial_name))
+            raise
+
+        if 'note' in form:
+            for note in form.getlist('note'):
+                if len(note):
+                    fh = factory(None, None, 'note.txt', None)
+                    fh.write(bytes(note+"\n",'utf-8'))
+                    fh.seek(0)
+
+        if results:
+            return T_PAGE % (T_DONE % "\n".join(T_RESULT.format(**res) for res in results))
+        else:
+            print("FAIL: empty submission")
+            os.rmdir(dir_name)
+            return "It appears that you submitted neither a file nor a note.\n"
+
+
     if serve_source:
-        @app.route('/'+os.path.basename(__file__))
+        @app.route(os.path.join(base_path, os.path.basename(__file__)))
         def sourcecode():
             with open(__file__) as fh:
                 return Response(fh.read(),mimetype='text/plain')
@@ -238,67 +302,6 @@ class HashPipeFileStream(object):
                             hash            = self.hash.hexdigest(),
                             seconds         = seconds,
                             kbps            = self.length/seconds/1024) )
-
-@app.route("/", methods=["GET", "POST"])
-def endpoint():
-
-    config = app.config['dropsite']
-
-    if request.method == 'GET':
-        return T_PAGE % (T_FORM +
-                         ('<p><a href=%s>source code</a></p>' % os.path.basename(__file__)
-                          if config['serve_source'] else ''))
-
-    dir_name = None
-
-    if config['save_to']:
-        dir_name = os.path.join(config['save_to'], datetime.datetime.now().isoformat().replace(':','-'))
-        assert not os.path.exists(dir_name), "%s existing was unexpected" % (dir_name,)
-        os.mkdir(dir_name)
-
-    results, open_streams = [], []
-
-    def callback(res):
-        results.append(res)
-        print("OK: {filename!r} ({length} bytes @ at {kbps:.1f} KB/s) -> {actual_filename!r}".format(**res))
-
-    factory = HashPipeFileStream.factory_factory(
-                register = open_streams.append,
-                callback = callback,
-                dir_name = dir_name,
-                pipeline = config['pipeline'],
-                suffix   = config['suffix'],
-                hash_fn  = hashlib.sha256
-                )
-
-    try:
-        stream, form, files = parse_form_data(request.environ, stream_factory=factory)
-
-    except ClientDisconnected:
-        for stream in open_streams:
-            if stream.done:
-                continue
-            stream.cleanup()
-            if stream.actual_filename is not None:
-                _, partial_name = stream.ensure_unique(stream.actual_filename, '.partial')
-                os.rename(str(stream.actual_filename), str(partial_name))
-            print("FAIL: during a supposed %s byte request, client disconnected after writing %s bytes of %r to %r" % (
-                    stream.req_length, stream.length, stream.filename, partial_name))
-        raise
-
-    if 'note' in form:
-        for note in form.getlist('note'):
-            if len(note):
-                fh = factory(None, None, 'note.txt', None)
-                fh.write(bytes(note+"\n",'utf-8'))
-                fh.seek(0)
-
-    if results:
-        return T_PAGE % (T_DONE % "\n".join(T_RESULT.format(**res) for res in results))
-    else:
-        print("FAIL: empty submission")
-        os.rmdir(dir_name)
-        return "It appears that you submitted neither a file nor a note.\n"
 
 
 T_PAGE="""<!doctype html>
