@@ -12,7 +12,7 @@ same, but also encrypt files for user@host and append .gpg to filenames:
 
 same, but compress files with gzip before encrypting:
 
-dropsite.py -S ./uploads -P 'gzip|gpg -er user@host' --suffix .gz.gpg
+    dropsite.py -S ./uploads -P 'gzip|gpg -er user@host' --suffix .gz.gpg
 
 rate-limit uploads to 20KB/sec, but don't actually save them:
 

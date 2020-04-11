@@ -35,11 +35,12 @@ ways to use it:
 """
 
 __author__  = "Leif Ryge"
-__date__    = "2018-02-13"
+__date__    = "2019-12-22"
 __license__ = "none"
 __version__ = "0"
 
 import os
+import sys
 import time
 import hashlib
 import datetime
@@ -51,23 +52,23 @@ from werkzeug.formparser import parse_form_data
 from werkzeug.serving import run_simple
 from werkzeug.utils import secure_filename
 
+assert sys.version_info[0] >= 3, "dropsite requires python3"
+
 app = Flask(__name__)
 
 # unnecessary, but makes this also work as subcommand of flask
-register_flask_subcommand = lambda f: app.cli.command()(f) and f
 
 @click.command()
-@register_flask_subcommand
 @click.option('-S', '--save-to',  help="Directory to save files to",
                                           type=click.Path(file_okay=False, dir_okay=True,
                                                           exists=True, writable=True,
                                                           resolve_path=True))
 @click.option('-P', '--pipeline',   help="Shell pipeline to process files through")
 @click.option('-s', '--suffix',     help="String to append to filenames", default="")
-@click.option('-p', '--port',       help="Port to listen on", default=8080)
-@click.option('-H', '--host',       help="IP to listen on", default="127.0.0.1")
+@click.option('-p', '--port',       help="Port to listen on", default=8080, show_default=True)
+@click.option('-H', '--host',       help="IP to listen on", default="127.0.0.1", show_default=True)
 @click.option('-t', '--onion',      help="Create an ephemeral Tor onion service", is_flag=True)
-@click.option('-T', '--onion-port', help="Port to receive Tor onion service connections", default=80)
+@click.option('-T', '--onion-port', help="Port to receive Tor onion service connections (when --onion is specified)", default=80, show_default=True)
 @click.option('--serve-source',     help="Include a link to the source code", is_flag=True)
 @click.pass_context
 def dropsite(ctx, port, host, save_to, pipeline, suffix, onion, onion_port, serve_source):
@@ -92,6 +93,8 @@ same, but compress files with gzip before encrypting:
 rate-limit uploads to 20KB/sec, but don't actually save them:
     dropsite.py -P 'pv -L 20k' # pv also prints throughput
     """
+
+#    app.logger.handlers = []
 
     if serve_source:
         @app.route('/'+os.path.basename(__file__))
@@ -185,7 +188,7 @@ class HashPipeFileStream(object):
         
         if dir_name is None:
             self.filename = filename
-            self.actual_filename = '/dev/null'
+            self.actual_filename = None
 
         else:
             filename = os.path.join(dir_name, filename)
@@ -194,7 +197,10 @@ class HashPipeFileStream(object):
             self.filename = os.path.basename(filename)
             self.actual_filename = actual_filename
 
-        self.fh = open(self.actual_filename, "wb")
+        if self.actual_filename is not None:
+            self.fh = open(self.actual_filename, "wb")
+        else:
+            self.fh = open('/dev/null', "wb") # fixme
 
         if pipeline is not None:
             self.proc = subprocess.Popen(pipeline, stdout=self.fh, stdin=subprocess.PIPE, shell=True)
@@ -273,8 +279,9 @@ def endpoint():
             if stream.done:
                 continue
             stream.cleanup()
-            _, partial_name = stream.ensure_unique(stream.actual_filename, '.partial')
-            os.rename(str(stream.actual_filename), str(partial_name))
+            if stream.actual_filename is not None:
+                _, partial_name = stream.ensure_unique(stream.actual_filename, '.partial')
+                os.rename(str(stream.actual_filename), str(partial_name))
             print("FAIL: during a supposed %s byte request, client disconnected after writing %s bytes of %r to %r" % (
                     stream.req_length, stream.length, stream.filename, partial_name))
         raise
@@ -321,7 +328,7 @@ T_FORM="""
 <h2>step 2: click the send button</h2>
 <input type=submit value=send>
 </form>
-<p>Prefer to upload from the command line? Use the following command:</p>
+<p>You can also use this command to upload from the command-line (replacing FILENAME and URL appropriately):</p>
 <p>curl -F upload=@./FILENAME http://URL/</p>
 """
 
