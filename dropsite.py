@@ -113,7 +113,7 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
             controller.authenticate()
             print("Creating ephemeral onion listener...")
             resp = controller.create_ephemeral_hidden_service({onion_port:port}, await_publication=True, detached=True)
-            print("Listening at http://%s.onion%s/" % (resp.service_id, ':%s'%(onion_port,) if onion_port is not 80 else ''))
+            print("Listening at http://%s.onion%s/" % (resp.service_id, ':%s'%(onion_port,) if onion_port != 80 else ''))
 
     app.config.update( dropsite=dict(pipeline=pipeline, save_to=save_to, suffix=suffix, serve_source=serve_source) )
 
