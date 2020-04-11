@@ -95,6 +95,51 @@ rate-limit uploads to 20KB/sec, but don't actually save them:
 
 #    app.logger.handlers = []
 
+    T_PAGE="""<!doctype html>
+    <head>
+    <title>dropsite</title>
+    <style type="text/css">
+    body {
+    margin: 2em;
+    font-family: Monospace;
+    font-size: smaller;
+    }
+    h1 { border-bottom:1px solid black }
+    th { text-align: left; padding-right:2em; border-bottom:1px solid black}
+    td { background: #ddd; padding:.5em; }
+    </style>
+    </head>
+    <body>%s</body>
+    """
+
+    T_FORM="""
+    <h1>dropsite</h1>
+    <form method=post enctype=multipart/form-data>
+    <h2>step 1: type a message and/or select file(s) to upload</h2>
+    <textarea name=note cols=72 rows=5></textarea>
+    <br><br>
+    <input type=file name=file multiple=multiple>
+    <h2>step 2: click the send button</h2>
+    <input type=submit value=send>
+    </form>
+    <p>You can also use this command to upload from the command-line (replacing FILENAME and URL appropriately):</p>
+    <p>curl -F upload=@./FILENAME http://URL/</p>
+    """
+
+    T_RESULT="""<tr> <td>{filename}</td> <td>{length}</td> <td>{kbps:.1f}</td> <td>{seconds:.1f} seconds</td>
+    <td>{hash}</td>
+    </tr>
+    """
+
+    T_DONE="""
+    <h1>upload successful</h1>
+    <table>
+     <tr><th>Filename</th><th>Bytes</th><th>KB/sec</th><th>Time</th><th>SHA256</th></tr>
+    %%s
+    </table>
+    <p><a href="%s">Back</a></p>
+    """ % (base_path,)
+
     app = Flask(__name__)
 
 
@@ -303,51 +348,6 @@ class HashPipeFileStream(object):
                             seconds         = seconds,
                             kbps            = self.length/seconds/1024) )
 
-
-T_PAGE="""<!doctype html>
-<head>
-<title>dropsite</title>
-<style type="text/css">
-body {
-margin: 2em;
-font-family: Monospace;
-font-size: smaller;
-}
-h1 { border-bottom:1px solid black }
-th { text-align: left; padding-right:2em; border-bottom:1px solid black}
-td { background: #ddd; padding:.5em; }
-</style>
-</head>
-<body>%s</body>
-"""
-
-T_FORM="""
-<h1>dropsite</h1>
-<form method=post enctype=multipart/form-data>
-<h2>step 1: type a message and/or select file(s) to upload</h2>
-<textarea name=note cols=72 rows=5></textarea>
-<br><br>
-<input type=file name=file multiple=multiple>
-<h2>step 2: click the send button</h2>
-<input type=submit value=send>
-</form>
-<p>You can also use this command to upload from the command-line (replacing FILENAME and URL appropriately):</p>
-<p>curl -F upload=@./FILENAME http://URL/</p>
-"""
-
-T_RESULT="""<tr> <td>{filename}</td> <td>{length}</td> <td>{kbps:.1f}</td> <td>{seconds:.1f} seconds</td>
-<td>{hash}</td>
-</tr>
-"""
-
-T_DONE="""
-<h1>upload successful</h1>
-<table>
- <tr><th>Filename</th><th>Bytes</th><th>KB/sec</th><th>Time</th><th>SHA256</th></tr>
-%s
-</table>
-<p><a href="/">Back</a></p>
-"""
 
 if __name__ == "__main__":
     dropsite()
